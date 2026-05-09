@@ -764,6 +764,7 @@ tr:last-child td { border-bottom: none; }
         </div>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <button class="btn btn-accent" onclick="testSupabase()" style="flex:1">🔌 Проверить соединение</button>
+          <button class="btn" onclick="debugSupabaseWrite()" style="flex:1">🧪 Тест записи</button>
           <button class="btn" onclick="saveSupabaseSettings()" style="flex:1">💾 Сохранить</button>
         </div>
         <div class="status-indicator" id="sbStatus">
@@ -1246,7 +1247,7 @@ function exportCSV() {
 
 // ─── Supabase ────────────────────────────────────────────────────────────────
 function saveSupabaseSettings() {
-  sbConfig.url = document.getElementById('sbUrl').value.trim();
+  sbConfig.url = document.getElementById('sbUrl').value.trim().replace(/[\s\u200B-\u200D\uFEFF]/g, '').replace(/\/+$/, '');
   sbConfig.key = document.getElementById('sbKey').value.trim();
   localStorage.setItem('fkgs_sb_config', JSON.stringify(sbConfig));
   showToast('Настройки Supabase сохранены', 'success');
@@ -1286,10 +1287,48 @@ async function ensureTablesExist(url, key) {
   // We'll try to upsert and catch schema errors
 }
 
+async function debugSupabaseWrite() {
+  const url = document.getElementById('sbUrl').value.trim().replace(/[\s\u200B-\u200D\uFEFF]/g, '').replace(/\/+$/, '');
+  const key = document.getElementById('sbKey').value.trim();
+  if (!url || !key) { showToast('Введите URL и Key', 'error'); return; }
+  try { new URL(url); } catch(e) { showToast('Неверный URL: ' + url, 'error'); return; }
+  const testUrl = `${url}/rest/v1/fkgs_snapshots`;
+  showToast('Тест: ' + testUrl, 'info');
+  console.log('[debug] POST to:', testUrl);
+  try {
+    const res = await fetch(testUrl, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({ report_date: 'test', total_votes: 0, plan_votes: 0, uploaded_at: new Date().toISOString() })
+    });
+    const text = await res.text();
+    console.log('[debug] status:', res.status, 'body:', text);
+    if (res.ok || res.status === 201 || res.status === 409) {
+      showToast('✅ Запись работает! HTTP ' + res.status, 'success');
+    } else {
+      showToast('❌ HTTP ' + res.status + ': ' + text.substring(0, 120), 'error');
+    }
+  } catch(e) {
+    showToast('❌ Fetch error: ' + e.message, 'error');
+    console.error('[debug]', e);
+  }
+}
+
 async function saveToSupabase(snapshot) {
   if (!sbConfig.url || !sbConfig.key) return;
-  // Normalize base URL — strip trailing slashes
-  const base = sbConfig.url.replace(/\/+$/, '');
+  // Normalize: trim whitespace, invisible chars, trailing slashes
+  const base = sbConfig.url.trim().replace(/[\s\u200B-\u200D\uFEFF]/g, '').replace(/\/+$/, '');
+  // Validate URL format
+  try { new URL(base); } catch(e) {
+    showToast('Неверный Supabase URL: ' + base, 'error');
+    return;
+  }
+  console.log('[Supabase] base URL:', base);
   showLoading('Сохраняем в Supabase...');
   try {
     const headers = {
@@ -1358,7 +1397,8 @@ async function saveToSupabase(snapshot) {
     showToast(`☁️ Сохранено в Supabase: ${snapshot.date}, ${snapshot.objects.length} объектов`, 'success');
   } catch (err) {
     hideLoading();
-    showToast('Ошибка записи в Supabase: ' + err.message, 'error');
+    console.error('[Supabase save error]', err);
+    showToast('Ошибка записи в Supabase: ' + err.message + ' | URL: ' + base, 'error');
   }
 }
 
