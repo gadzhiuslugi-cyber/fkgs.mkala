@@ -1501,8 +1501,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const sqlSection = document.createElement('div');
     sqlSection.className = 'settings-section';
     sqlSection.innerHTML = `
-      <div class="settings-section-title">📋 SQL для создания таблиц в Supabase</div>
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text2);line-height:1.7;white-space:pre-wrap">CREATE TABLE fkgs_snapshots (
+      <div class="settings-section-title">📋 Создание таблиц в Supabase</div>
+      <p style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:10px">
+        Таблицы не найдены (HTTP 404). Скопируйте SQL и выполните в 
+        <a href="https://supabase.com/dashboard" target="_blank" style="color:var(--accent)">Supabase Dashboard → SQL Editor</a>
+      </p>
+      <div style="position:relative">
+        <div id="sqlBlock" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text2);line-height:1.7;white-space:pre-wrap;user-select:all">CREATE TABLE IF NOT EXISTS fkgs_snapshots (
   id BIGSERIAL PRIMARY KEY,
   report_date TEXT UNIQUE NOT NULL,
   total_votes INT,
@@ -1510,7 +1515,7 @@ document.addEventListener('DOMContentLoaded', function() {
   uploaded_at TIMESTAMPTZ
 );
 
-CREATE TABLE fkgs_objects (
+CREATE TABLE IF NOT EXISTS fkgs_objects (
   id BIGSERIAL PRIMARY KEY,
   report_date TEXT NOT NULL,
   num INT,
@@ -1518,18 +1523,46 @@ CREATE TABLE fkgs_objects (
   votes INT
 );
 
-CREATE TABLE fkgs_design (
+CREATE TABLE IF NOT EXISTS fkgs_design (
   id BIGSERIAL PRIMARY KEY,
   report_date TEXT NOT NULL,
   num INT,
   name TEXT,
   votes INT
-);</div>
-      <p style="font-size:11px;color:var(--text3);margin-top:8px">Выполните этот SQL в Supabase Dashboard → SQL Editor один раз перед первой загрузкой</p>
+);
+
+-- Enable Row Level Security and allow all (adjust as needed)
+ALTER TABLE fkgs_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fkgs_objects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fkgs_design ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "allow_all_snapshots" ON fkgs_snapshots FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_objects"   ON fkgs_objects   FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_design"    ON fkgs_design     FOR ALL USING (true) WITH CHECK (true);</div>
+        <button onclick="copySql()" class="btn" style="margin-top:8px;width:100%;justify-content:center">📋 Скопировать SQL</button>
+      </div>
+      <p style="font-size:11px;color:var(--accent3);margin-top:10px;line-height:1.5">
+        ⚠️ Если таблицы уже созданы но запись не работает — проверьте что включены политики RLS (строки CREATE POLICY выше)
+      </p>
     `;
     settingsBody.appendChild(sqlSection);
   }
 });
+function copySql() {
+  const sql = document.getElementById('sqlBlock').textContent;
+  navigator.clipboard.writeText(sql).then(() => {
+    showToast('✅ SQL скопирован в буфер обмена', 'success');
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = sql;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('✅ SQL скопирован', 'success');
+  });
+}
 </script>
 </body>
 </html>
