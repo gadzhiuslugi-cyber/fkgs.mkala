@@ -1261,7 +1261,7 @@ async function testSupabase() {
   st.innerHTML = '<div class="status-dot checking"></div><span>Проверка соединения...</span>';
 
   try {
-    const res = await fetch(`${url}/rest/v1/`, {
+    const res = await fetch(`${url.replace(/\/+$/, '')}/rest/v1/`, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
     });
     if (res.ok || res.status === 200 || res.status === 404) {
@@ -1288,6 +1288,8 @@ async function ensureTablesExist(url, key) {
 
 async function saveToSupabase(snapshot) {
   if (!sbConfig.url || !sbConfig.key) return;
+  // Normalize base URL — strip trailing slashes
+  const base = sbConfig.url.replace(/\/+$/, '');
   showLoading('Сохраняем в Supabase...');
   try {
     const headers = {
@@ -1298,7 +1300,7 @@ async function saveToSupabase(snapshot) {
     };
 
     // Save snapshot
-    const snapRes = await fetch(`${sbConfig.url}/rest/v1/fkgs_snapshots`, {
+    const snapRes = await fetch(`${base}/rest/v1/fkgs_snapshots`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -1321,7 +1323,7 @@ async function saveToSupabase(snapshot) {
       votes: o.votes
     }));
     if (objPayload.length) {
-      const objRes = await fetch(`${sbConfig.url}/rest/v1/fkgs_objects`, {
+      const objRes = await fetch(`${base}/rest/v1/fkgs_objects`, {
         method: 'POST',
         headers,
         body: JSON.stringify(objPayload)
@@ -1340,7 +1342,7 @@ async function saveToSupabase(snapshot) {
       votes: d.votes
     }));
     if (desPayload.length) {
-      const desRes = await fetch(`${sbConfig.url}/rest/v1/fkgs_design`, {
+      const desRes = await fetch(`${base}/rest/v1/fkgs_design`, {
         method: 'POST',
         headers,
         body: JSON.stringify(desPayload)
@@ -1362,6 +1364,7 @@ async function saveToSupabase(snapshot) {
 
 async function loadFromSupabase() {
   if (!sbConfig.url || !sbConfig.key) { showToast('Настройте Supabase в настройках', 'error'); return; }
+  const base = sbConfig.url.replace(/\/+$/, '');
   showLoading('Загружаем из Supabase...');
   try {
     const headers = {
@@ -1370,7 +1373,7 @@ async function loadFromSupabase() {
     };
 
     // Load latest snapshot
-    const snapRes = await fetch(`${sbConfig.url}/rest/v1/fkgs_snapshots?order=report_date.desc&limit=50`, { headers });
+    const snapRes = await fetch(`${base}/rest/v1/fkgs_snapshots?order=report_date.desc&limit=50`, { headers });
     const snaps = await snapRes.json();
 
     if (!Array.isArray(snaps) || snaps.length === 0) {
@@ -1382,10 +1385,10 @@ async function loadFromSupabase() {
     // Load objects and design for latest snapshot
     const latestDate = snaps[0].report_date;
 
-    const objRes = await fetch(`${sbConfig.url}/rest/v1/fkgs_objects?report_date=eq.${encodeURIComponent(latestDate)}&order=num.asc`, { headers });
+    const objRes = await fetch(`${base}/rest/v1/fkgs_objects?report_date=eq.${encodeURIComponent(latestDate)}&order=num.asc`, { headers });
     const objects = await objRes.json();
 
-    const desRes = await fetch(`${sbConfig.url}/rest/v1/fkgs_design?report_date=eq.${encodeURIComponent(latestDate)}&order=num.asc`, { headers });
+    const desRes = await fetch(`${base}/rest/v1/fkgs_design?report_date=eq.${encodeURIComponent(latestDate)}&order=num.asc`, { headers });
     const design = await desRes.json();
 
     // Load all snapshots for daily stats
